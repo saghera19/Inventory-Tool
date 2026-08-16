@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockFlow — Inventory Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+              400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+              800: '#1e40af', 900: '#1e3a8a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: calc(200px + 100%) 0; } }
+    .shimmer { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200px 100%; animation: shimmer 1.5s infinite; }
+    .dark .shimmer { background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); background-size: 200px 100%; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+    .dark ::-webkit-scrollbar-thumb { background: #475569; }
+    * { transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 antialiased min-h-screen">
+  <div id="app"></div>
+
+  <script>
+    // ============== DATA STORE ==============
+    const DB = {
+      init() {
+        if (!localStorage.getItem('sf_initialized')) {
+          this.seed();
+          localStorage.setItem('sf_initialized', 'true');
+        }
+      },
+      seed() {
+        const user = { id: 1, name: 'Rajesh Kumar', email: 'demo@shop.com', password: 'demo123', shopName: 'Kumar General Store' };
+        localStorage.setItem('sf_users', JSON.stringify([user]));
+
+        const categories = [
+          { id: 1, name: 'Groceries', description: 'Daily groceries and food items' },
+          { id: 2, name: 'Electronics', description: 'Electronic items and accessories' },
+          { id: 3, name: 'Stationery', description: 'Office and school supplies' },
+          { id: 4, name: 'Personal Care', description: 'Health and hygiene products' },
+          { id: 5, name: 'Beverages', description: 'Drinks and liquid refreshments' },
+          { id: 6, name: 'Snacks', description: 'Packaged snacks and munchies' }
+        ];
+        localStorage.setItem('sf_categories', JSON.stringify(categories));
+
+        const products = [
+          { id: 1, name: 'Toor Dal', sku: 'GR-001', categoryId: 1, unit: 'kg', currentStock: 45, minStockLevel: 10, purchasePrice: 120, sellingPrice: 145 },
+          { id: 2, name: 'Basmati Rice (5kg)', sku: 'GR-002', categoryId: 1, unit: 'pcs', currentStock: 30, minStockLevel: 8, purchasePrice: 320, sellingPrice: 380 },
+          { id: 3, name: 'Mustard Oil (1L)', sku: 'GR-003', categoryId: 1, unit: 'pcs', currentStock: 5, minStockLevel: 10, purchasePrice: 170, sellingPrice: 195 },
+          { id: 4, name: 'Sugar (1kg)', sku: 'GR-004', categoryId: 1, unit: 'pcs', currentStock: 60, minStockLevel: 15, purchasePrice: 42, sellingPrice: 48 },
+          { id: 5, name: 'Wheat Flour (5kg)', sku: 'GR-005', categoryId: 1, unit: 'pcs', currentStock: 3, minStockLevel: 5, purchasePrice: 195, sellingPrice: 230 },
+          { id: 6, name: 'USB Charger Cable', sku: 'EL-001', categoryId: 2, unit: 'pcs', currentStock: 25, minStockLevel: 5, purchasePrice: 85, sellingPrice: 149 },
+          { id: 7, name: 'LED Bulb 9W', sku: 'EL-002', categoryId: 2, unit: 'pcs', currentStock: 40, minStockLevel: 10, purchasePrice: 65, sellingPrice: 99 },
+          { id: 8, name: 'Extension Board 4-way', sku: 'EL-003', categoryId: 2, unit: 'pcs', currentStock: 2, minStockLevel: 5, purchasePrice: 250, sellingPrice: 380 },
+          { id: 9, name: 'Notebook (200 pages)', sku: 'ST-001', categoryId: 3, unit: 'pcs', currentStock: 100, minStockLevel: 20, purchasePrice: 35, sellingPrice: 50 },
+          { id: 10, name: 'Ball Pen (Pack of 10)', sku: 'ST-002', categoryId: 3, unit: 'pcs', currentStock: 50, minStockLevel: 10, purchasePrice: 60, sellingPrice: 85 },
+          { id: 11, name: 'Colgate Toothpaste 200g', sku: 'PC-001', categoryId: 4, unit: 'pcs', currentStock: 35, minStockLevel: 10, purchasePrice: 95, sellingPrice: 110 },
+          { id: 12, name: 'Dettol Soap (3-pack)', sku: 'PC-002', categoryId: 4, unit: 'pcs', currentStock: 20, minStockLevel: 8, purchasePrice: 120, sellingPrice: 145 },
+          { id: 13, name: 'Coca-Cola 2L', sku: 'BV-001', categoryId: 5, unit: 'pcs', currentStock: 15, minStockLevel: 5, purchasePrice: 75, sellingPrice: 95 },
+          { id: 14, name: 'Amul Lassi (200ml)', sku: 'BV-002', categoryId: 5, unit: 'pcs', currentStock: 48, minStockLevel: 15, purchasePrice: 20, sellingPrice: 25 },
+          { id: 15, name: 'Lays Classic (Large)', sku: 'SN-001', categoryId: 6, unit: 'pcs', currentStock: 8, minStockLevel: 10, purchasePrice: 32, sellingPrice: 40 },
+          { id: 16, name: 'Parle-G Biscuits', sku: 'SN-002', categoryId: 6, unit: 'pcs', currentStock: 75, minStockLevel: 20, purchasePrice: 8, sellingPrice: 10 }
+        ];
+        localStorage.setItem('sf_products', JSON.stringify(products));
+
+        const parties = [
+          { id: 1, name: 'Metro Cash & Carry', type: 'supplier', phone: '9876543210', email: 'metro@supply.com', address: 'Industrial Area, Phase 2', gst: '29ABCDE1234F1Z5' },
+          { id: 2, name: 'Patel Distributors', type: 'supplier', phone: '9876543211', email: 'patel@dist.com', address: 'MG Road, Main Market', gst: '29FGHIJ5678K2Z6' },
+          { id: 3, name: 'National Traders', type: 'supplier', phone: '9876543212', email: '', address: 'Nehru Nagar, Block C', gst: '29KLMNO9012P3Z7' },
+          { id: 4, name: 'Sharma Electronics', type: 'supplier', phone: '9876543213', email: 'sharma@elec.com', address: 'Electronics Market, Shop 45', gst: '' },
+          { id: 5, name: 'Sunrise Wholesale', type: 'supplier', phone: '9876543214', email: '', address: 'APMC Yard, Gate 3', gst: '29PQRST3456U4Z8' },
+          { id: 6, name: 'Anita Bakery', type: 'customer', phone: '9988776655', email: 'anita@bakery.com', address: 'Main Street, Near Bus Stand', gst: '' },
+          { id: 7, name: 'Green Canteen', type: 'customer', phone: '9988776656', email: '', address: 'Tech Park, Building 4', gst: '' },
+          { id: 8, name: 'Ravi Kirana Store', type: 'customer', phone: '9988776657', email: 'ravi@kirana.com', address: 'Old Town, Lane 3', gst: '29UVWXY7890Z5A9' },
+          { id: 9, name: 'Hotel Sunrise', type: 'customer', phone: '9988776658', email: '', address: 'Highway Road, KM 5', gst: '' },
+          { id: 10, name: 'Deepak Mess', type: 'customer', phone: '9988776659', email: '', address: 'College Road, Opposite Gate', gst: '' }
+        ];
+        localStorage.setItem('sf_parties', JSON.stringify(parties));
+
+        // Generate transactions
+        const transactions = [];
+        let txnId = 1;
+        const now = new Date();
+        for (let d = 30; d >= 0; d--) {
+          const date = new Date(now);
+          date.setDate(date.getDate() - d);
+          const dateStr = date.toISOString().split('T')[0];
+
+          if (Math.random() > 0.3) {
+            const prod = products[Math.floor(Math.random() * products.length)];
+            const suppliers = parties.filter(p => p.type === 'supplier');
+            const party = suppliers[Math.floor(Math.random() * suppliers.length)];
+            const qty = Math.floor(Math.random() * 30) + 5;
+            transactions.push({
+              id: txnId++, type: 'received', productId: prod.id, partyId: party.id,
+              quantity: qty, pricePerUnit: prod.purchasePrice, totalAmount: qty * prod.purchasePrice,
+              date: dateStr, invoiceNumber: `PO-2024${String(d).padStart(3, '0')}`, notes: `Stock from ${party.name}`
+            });
+          }
+          if (Math.random() > 0.25) {
+            const prod = products[Math.floor(Math.random() * products.length)];
+            const customers = parties.filter(p => p.type === 'customer');
+            const party = customers[Math.floor(Math.random() * customers.length)];
+            const qty = Math.floor(Math.random() * 15) + 1;
+            transactions.push({
+              id: txnId++, type: 'issued', productId: prod.id, partyId: party.id,
+              quantity: qty, pricePerUnit: prod.sellingPrice, totalAmount: qty * prod.sellingPrice,
+              date: dateStr, invoiceNumber: `INV-2024${String(d).padStart(3, '0')}`, notes: `Sale to ${party.name}`
+            });
+          }
+        }
+        localStorage.setItem('sf_transactions', JSON.stringify(transactions));
+        localStorage.setItem('sf_nextId', JSON.stringify({ category: 7, product: 17, party: 11, transaction: txnId }));
+      },
+      get(key) { try { return JSON.parse(localStorage.getItem(`sf_${key}`)) || []; } catch { return []; } },
+      set(key, data) { localStorage.setItem(`sf_${key}`, JSON.stringify(data)); },
+      getNextId(type) {
+        const ids = JSON.parse(localStorage.getItem('sf_nextId')) || { category: 1, product: 1, party: 1, transaction: 1 };
+        const id = ids[type];
+        ids[type]++;
+        localStorage.setItem('sf_nextId', JSON.stringify(ids));
+        return id;
+      }
+    };
+
+    // ============== APP STATE ==============
+    let state = {
+      user: null,
+      page: 'dashboard',
+      dark: localStorage.getItem('sf_theme') === 'dark',
+      sidebarOpen: false,
+      modal: null,
+      editing: null,
+      search: '',
+      catFilter: ''
+    };
+
+    // ============== HELPERS ==============
+    const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+    const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const $ = (id) => document.getElementById(id);
+    const html = (str) => str;
+
+    function applyTheme() {
+      if (state.dark) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('sf_theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('sf_theme', 'light');
+      }
+    }
+
+    // ============== ICONS ==============
+    const icons = {
+      home: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>`,
+      package: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>`,
+      folder: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>`,
+      arrowDown: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>`,
+      arrowUp: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>`,
+      truck: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>`,
+      users: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>`,
+      sun: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>`,
+      moon: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>`,
+      menu: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>`,
+      logout: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>`,
+      search: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>`,
+      plus: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
+      edit: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>`,
+      trash: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>`,
+      close: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>`,
+      phone: `<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" /></svg>`,
+      email: `<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>`,
+      location: `<svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>`
+    };
+
+    // ============== RENDER FUNCTIONS ==============
+    function renderLogin() {
+      return `
+        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-4">
+          <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+              <div class="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur-lg rounded-2xl mb-4">
+                ${icons.package.replace('w-5 h-5', 'w-8 h-8 text-white')}
+              </div>
+              <h1 class="text-3xl font-bold text-white">StockFlow</h1>
+              <p class="text-brand-200 mt-1">Inventory Management for Smart Business</p>
+            </div>
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
+              <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">Welcome Back</h2>
+              <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">Sign in to your account</p>
+              <div id="loginError" class="hidden mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm"></div>
+              <form id="loginForm" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                  <input type="email" id="loginEmail" value="demo@shop.com" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none text-gray-900 dark:text-white" placeholder="you@example.com" required />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                  <input type="password" id="loginPassword" value="demo123" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none text-gray-900 dark:text-white" placeholder="••••••••" required />
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-semibold">Sign In</button>
+              </form>
+              <div class="mt-4 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800 rounded-lg">
+                <p class="text-xs text-brand-700 dark:text-brand-300 font-medium">Demo Credentials</p>
+                <p class="text-xs text-brand-600 dark:text-brand-400">Email: demo@shop.com | Password: demo123</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSidebar() {
+      const navItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: icons.home },
+        { id: 'products', label: 'Products', icon: icons.package, group: 'Inventory' },
+        { id: 'categories', label: 'Categories', icon: icons.folder, group: 'Inventory' },
+        { id: 'stock-in', label: 'Stock Received', icon: icons.arrowDown, group: 'Transactions' },
+        { id: 'stock-out', label: 'Stock Issued', icon: icons.arrowUp, group: 'Transactions' },
+        { id: 'suppliers', label: 'Suppliers', icon: icons.truck, group: 'Parties' },
+        { id: 'customers', label: 'Customers', icon: icons.users, group: 'Parties' }
+      ];
+
+      let lastGroup = '';
+      const navHtml = navItems.map(item => {
+        let groupHtml = '';
+        if (item.group && item.group !== lastGroup) {
+          groupHtml = `<p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-3 pt-5 pb-1">${item.group}</p>`;
+          lastGroup = item.group;
+        }
+        const active = state.page === item.id;
+        return `${groupHtml}
+          <button onclick="navigate('${item.id}')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${active ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'}">
+            ${item.icon}<span>${item.label}</span>
+          </button>`;
+      }).join('');
+
+      return `
+        <aside class="fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transform transition-transform lg:translate-x-0 ${state.sidebarOpen ? 'translate-x-0' : '-translate-x-full'}">
+          <div class="flex items-center gap-3 px-5 py-5 border-b border-gray-100 dark:border-gray-800">
+            <div class="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center flex-shrink-0">${icons.package.replace('w-5 h-5', 'w-5 h-5 text-white')}</div>
+            <div class="min-w-0">
+              <h1 class="font-bold text-gray-900 dark:text-white text-lg leading-tight">StockFlow</h1>
+              <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">${state.user?.shopName || 'My Shop'}</p>
+            </div>
+          </div>
+          <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">${navHtml}</nav>
+          <div class="border-t border-gray-100 dark:border-gray-800 p-3">
+            <div class="flex items-center gap-3 px-2 py-2">
+              <div class="w-8 h-8 bg-brand-100 dark:bg-brand-900 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-brand-700 dark:text-brand-300 text-sm font-bold">${state.user?.name?.charAt(0) || 'U'}</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${state.user?.name || 'User'}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${state.user?.email || ''}</p>
+              </div>
+              <button onclick="logout()" class="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" title="Sign out">${icons.logout}</button>
+            </div>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderTopBar() {
+      const pageLabels = { dashboard: 'Dashboard', products: 'Products', categories: 'Categories', 'stock-in': 'Stock Received', 'stock-out': 'Stock Issued', suppliers: 'Suppliers', customers: 'Customers' };
+      return `
+        <header class="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800">
+          <div class="flex items-center justify-between px-4 lg:px-8 py-3">
+            <div class="flex items-center gap-3">
+              <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">${icons.menu}</button>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">${pageLabels[state.page] || 'Dashboard'}</h2>
+            </div>
+            <button onclick="toggleTheme()" class="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="${state.dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
+              ${state.dark ? icons.sun : icons.moon}
+            </button>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderDashboard() {
+      const products = DB.get('products');
+      const transactions = DB.get('transactions');
+      const parties = DB.get('parties');
+
+      const totalProducts = products.length;
+      const lowStockItems = products.filter(p => p.currentStock <= p.minStockLevel);
+      const lowStockCount = lowStockItems.length;
+      const inventoryValue = products.reduce((sum, p) => sum + (p.currentStock * p.purchasePrice), 0);
+
+      const now = new Date();
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const monthTxns = transactions.filter(t => t.date >= firstOfMonth);
+      const monthReceived = monthTxns.filter(t => t.type === 'received').reduce((s, t) => s + t.totalAmount, 0);
+      const monthIssued = monthTxns.filter(t => t.type === 'issued').reduce((s, t) => s + t.totalAmount, 0);
+
+      const totalSuppliers = parties.filter(p => p.type === 'supplier').length;
+      const totalCustomers = parties.filter(p => p.type === 'customer').length;
+
+      const recentTxns = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+
+      return `
+        <div class="space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            ${statCard('Total Products', totalProducts, 'Active items in inventory', 'bg-brand-100 dark:bg-brand-900/40', icons.package.replace('w-5 h-5', 'w-5 h-5 text-brand-600 dark:text-brand-400'))}
+            ${statCard('Inventory Value', fmt(inventoryValue), 'At purchase price', 'bg-green-100 dark:bg-green-900/40', `<svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>`)}
+            ${statCard('Month Purchases', fmt(monthReceived), `From ${totalSuppliers} suppliers`, 'bg-purple-100 dark:bg-purple-900/40', icons.arrowDown.replace('w-5 h-5', 'w-5 h-5 text-purple-600 dark:text-purple-400'))}
+            ${statCard('Month Sales', fmt(monthIssued), `To ${totalCustomers} customers`, 'bg-amber-100 dark:bg-amber-900/40', icons.arrowUp.replace('w-5 h-5', 'w-5 h-5 text-amber-600 dark:text-amber-400'))}
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="rounded-xl border p-4 ${lowStockCount > 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'}">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center ${lowStockCount > 0 ? 'bg-red-100 dark:bg-red-900/50' : 'bg-green-100 dark:bg-green-900/50'}">
+                  <span class="text-xl">${lowStockCount > 0 ? '⚠️' : '✅'}</span>
+                </div>
+                <div>
+                  <p class="text-2xl font-bold ${lowStockCount > 0 ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'}">${lowStockCount}</p>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">Low Stock Alerts</p>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-xl border bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 p-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center"><span class="text-xl">📦</span></div>
+                <div><p class="text-2xl font-bold text-blue-700 dark:text-blue-400">${totalSuppliers}</p><p class="text-sm text-gray-600 dark:text-gray-400">Active Suppliers</p></div>
+              </div>
+            </div>
+            <div class="rounded-xl border bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 p-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center"><span class="text-xl">👥</span></div>
+                <div><p class="text-2xl font-bold text-orange-700 dark:text-orange-400">${totalCustomers}</p><p class="text-sm text-gray-600 dark:text-gray-400">Active Customers</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+              <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800"><h3 class="font-semibold text-gray-900 dark:text-white">Recent Transactions</h3></div>
+              <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                ${recentTxns.length === 0 ? '<div class="p-8 text-center"><p class="text-gray-400 dark:text-gray-500">No transactions yet</p></div>' : recentTxns.map(t => {
+                  const prod = products.find(p => p.id === t.productId);
+                  const party = parties.find(p => p.id === t.partyId);
+                  return `
+                    <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${t.type === 'received' ? 'bg-green-100 dark:bg-green-900/40' : 'bg-orange-100 dark:bg-orange-900/40'}">
+                          ${t.type === 'received' ? '<svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>' : '<svg class="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>'}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="text-sm font-medium text-gray-900 dark:text-white truncate">${prod?.name || 'Unknown'}</p>
+                          <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${t.type === 'received' ? 'From' : 'To'}: ${party?.name || '—'} · ${t.quantity} qty</p>
+                        </div>
+                      </div>
+                      <div class="text-right flex-shrink-0 ml-3">
+                        <p class="text-sm font-semibold ${t.type === 'received' ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}">${fmt(t.totalAmount)}</p>
+                        <p class="text-[11px] text-gray-400">${new Date(t.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
+                      </div>
+                    </div>`;
+                }).join('')}
+              </div>
+            </div>
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+              <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800"><h3 class="font-semibold text-gray-900 dark:text-white">Low Stock Alerts</h3></div>
+              <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                ${lowStockItems.length === 0 ? '<div class="p-8 text-center"><p class="text-4xl mb-2">✅</p><p class="text-gray-500 dark:text-gray-400 font-medium">All stock levels are healthy</p><p class="text-sm text-gray-400 dark:text-gray-500">No products below minimum levels</p></div>' : lowStockItems.slice(0, 8).map(item => `
+                  <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <div class="min-w-0"><p class="text-sm font-medium text-gray-900 dark:text-white truncate">${item.name}</p><p class="text-xs text-gray-500 dark:text-gray-400">SKU: ${item.sku}</p></div>
+                    <div class="text-right flex-shrink-0 ml-3"><p class="text-sm font-bold text-red-600 dark:text-red-400">${item.currentStock} ${item.unit}</p><p class="text-[11px] text-gray-400">Min: ${item.minStockLevel}</p></div>
+                  </div>`).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function statCard(title, value, subtitle, colorClass, icon) {
+      return `
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between">
+            <div><p class="text-sm text-gray-500 dark:text-gray-400 font-medium">${title}</p><p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">${value}</p><p class="text-xs text-gray-400 dark:text-gray-500 mt-1">${subtitle}</p></div>
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center ${colorClass}">${icon}</div>
+          </div>
+        </div>`;
+    }
+
+    function renderProducts() {
+      const products = DB.get('products');
+      const categories = DB.get('categories');
+      const search = state.search.toLowerCase();
+      const filtered = products.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search);
+        const matchCat = !state.catFilter || p.categoryId == state.catFilter;
+        return matchSearch && matchCat;
+      });
+
+      return `
+        <div class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex-1 flex flex-col sm:flex-row gap-3">
+              <div class="relative flex-1 max-w-sm">
+                ${icons.search.replace('w-4 h-4', 'absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400')}
+                <input type="text" placeholder="Search products..." value="${state.search}" oninput="state.search=this.value;render()" class="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" />
+              </div>
+              <select value="${state.catFilter}" onchange="state.catFilter=this.value;render()" class="px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white">
+                <option value="">All Categories</option>
+                ${categories.map(c => `<option value="${c.id}" ${state.catFilter == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+              </select>
+            </div>
+            <button onclick="openModal('product')" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 flex-shrink-0">${icons.plus} Add Product</button>
+          </div>
+          ${filtered.length === 0 ? `
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
+              <div class="text-5xl mb-4">📦</div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No products found</h3>
+              <p class="text-gray-500 dark:text-gray-400 mt-1">${search || state.catFilter ? 'Try adjusting your filters' : 'Get started by adding your first product'}</p>
+            </div>` : `
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead><tr class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Product</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400 hidden md:table-cell">Category</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Stock</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400 hidden sm:table-cell">Purchase ₹</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400 hidden sm:table-cell">Selling ₹</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>
+                  </tr></thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    ${filtered.map(p => {
+                      const cat = categories.find(c => c.id === p.categoryId);
+                      const isLow = p.currentStock <= p.minStockLevel;
+                      return `
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                          <td class="px-4 py-3">
+                            <div class="flex items-center gap-3">
+                              <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold ${isLow ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400'}">${p.name.charAt(0)}</div>
+                              <div class="min-w-0"><p class="font-medium text-gray-900 dark:text-white truncate">${p.name}</p><p class="text-xs text-gray-500 dark:text-gray-400">SKU: ${p.sku}</p></div>
+                            </div>
+                          </td>
+                          <td class="px-4 py-3 hidden md:table-cell"><span class="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-md text-xs">${cat?.name || '—'}</span></td>
+                          <td class="px-4 py-3 text-right"><span class="font-semibold ${isLow ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}">${p.currentStock} ${p.unit}</span>${isLow ? `<p class="text-[10px] text-red-500 dark:text-red-400">Below min (${p.minStockLevel})</p>` : ''}</td>
+                          <td class="px-4 py-3 text-right hidden sm:table-cell text-gray-700 dark:text-gray-300">${fmt(p.purchasePrice)}</td>
+                          <td class="px-4 py-3 text-right hidden sm:table-cell text-gray-700 dark:text-gray-300">${fmt(p.sellingPrice)}</td>
+                          <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                              <button onclick="editProduct(${p.id})" class="p-1.5 text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.edit}</button>
+                              <button onclick="deleteProduct(${p.id})" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.trash}</button>
+                            </div>
+                          </td>
+                        </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+              <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">Showing ${filtered.length} of ${products.length} products</div>
+            </div>`}
+        </div>
+      `;
+    }
+
+    function renderCategories() {
+      const categories = DB.get('categories');
+      const search = state.search.toLowerCase();
+      const filtered = categories.filter(c => c.name.toLowerCase().includes(search));
+
+      return `
+        <div class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="relative flex-1 max-w-sm">
+              ${icons.search.replace('w-4 h-4', 'absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400')}
+              <input type="text" placeholder="Search categories..." value="${state.search}" oninput="state.search=this.value;render()" class="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" />
+            </div>
+            <button onclick="openModal('category')" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 flex-shrink-0">${icons.plus} Add Category</button>
+          </div>
+          ${filtered.length === 0 ? `
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
+              <div class="text-5xl mb-4">📁</div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No categories found</h3>
+            </div>` : `
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              ${filtered.map(c => `
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow group">
+                  <div class="flex items-start justify-between">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-lg bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center">${icons.folder.replace('w-5 h-5', 'w-5 h-5 text-brand-600 dark:text-brand-400')}</div>
+                      <div><h4 class="font-semibold text-gray-900 dark:text-white">${c.name}</h4>${c.description ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">${c.description}</p>` : ''}</div>
+                    </div>
+                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onclick="editCategory(${c.id})" class="p-1.5 text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.edit}</button>
+                      <button onclick="deleteCategory(${c.id})" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.trash}</button>
+                    </div>
+                  </div>
+                </div>`).join('')}
+            </div>`}
+        </div>
+      `;
+    }
+
+    function renderTransactions(type) {
+      const transactions = DB.get('transactions').filter(t => t.type === type);
+      const products = DB.get('products');
+      const parties = DB.get('parties');
+      const partyType = type === 'received' ? 'supplier' : 'customer';
+      const partyLabel = type === 'received' ? 'Supplier' : 'Customer';
+      const title = type === 'received' ? 'Stock Received' : 'Stock Issued';
+      const colorClass = type === 'received' ? 'green' : 'orange';
+
+      const search = state.search.toLowerCase();
+      const filtered = transactions.filter(t => {
+        const prod = products.find(p => p.id === t.productId);
+        const party = parties.find(p => p.id === t.partyId);
+        return (prod?.name.toLowerCase().includes(search) || party?.name.toLowerCase().includes(search) || t.invoiceNumber?.toLowerCase().includes(search));
+      }).sort((a, b) => b.date.localeCompare(a.date));
+
+      const grandTotal = filtered.reduce((s, t) => s + t.totalAmount, 0);
+
+      return `
+        <div class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="relative flex-1 max-w-sm">
+              ${icons.search.replace('w-4 h-4', 'absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400')}
+              <input type="text" placeholder="Search ${title.toLowerCase()}..." value="${state.search}" oninput="state.search=this.value;render()" class="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" />
+            </div>
+            <button onclick="openModal('transaction-${type}')" class="px-4 py-2 bg-${colorClass}-600 hover:bg-${colorClass}-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 flex-shrink-0">${icons.plus} ${type === 'received' ? 'Record Purchase' : 'Record Sale'}</button>
+          </div>
+          <div class="rounded-xl border p-4 bg-${colorClass}-50 dark:bg-${colorClass}-900/10 border-${colorClass}-200 dark:border-${colorClass}-800">
+            <div class="flex items-center justify-between">
+              <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total ${type === 'received' ? 'Purchases' : 'Sales'} (${filtered.length} entries)</p>
+              <p class="text-xl font-bold text-${colorClass}-700 dark:text-${colorClass}-400">${fmt(grandTotal)}</p>
+            </div>
+          </div>
+          ${filtered.length === 0 ? `
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
+              <div class="text-5xl mb-4">${type === 'received' ? '📥' : '📤'}</div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No ${title.toLowerCase()} records</h3>
+            </div>` : `
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead><tr class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Date</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Product</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400 hidden md:table-cell">${partyLabel}</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Qty</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400 hidden sm:table-cell">Rate (₹)</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Amount (₹)</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>
+                  </tr></thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    ${filtered.map(t => {
+                      const prod = products.find(p => p.id === t.productId);
+                      const party = parties.find(p => p.id === t.partyId);
+                      return `
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                          <td class="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">${fmtDate(t.date)}</td>
+                          <td class="px-4 py-3"><p class="font-medium text-gray-900 dark:text-white">${prod?.name || 'Unknown'}</p><p class="text-xs text-gray-500 dark:text-gray-400">${prod?.sku || ''}</p></td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">${party?.name || '—'}</td>
+                          <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">${t.quantity}</td>
+                          <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden sm:table-cell">${fmt(t.pricePerUnit)}</td>
+                          <td class="px-4 py-3 text-right font-semibold text-${colorClass}-600 dark:text-${colorClass}-400">${fmt(t.totalAmount)}</td>
+                          <td class="px-4 py-3 text-right"><button onclick="deleteTransaction(${t.id})" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.trash}</button></td>
+                        </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>`}
+        </div>
+      `;
+    }
+
+    function renderParties(type) {
+      const parties = DB.get('parties').filter(p => p.type === type);
+      const label = type === 'supplier' ? 'Supplier' : 'Customer';
+      const labelPlural = type === 'supplier' ? 'Suppliers' : 'Customers';
+      const colorClass = type === 'supplier' ? 'blue' : 'orange';
+
+      const search = state.search.toLowerCase();
+      const filtered = parties.filter(p => p.name.toLowerCase().includes(search) || p.phone?.includes(search) || p.email?.toLowerCase().includes(search));
+
+      return `
+        <div class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="relative flex-1 max-w-sm">
+              ${icons.search.replace('w-4 h-4', 'absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400')}
+              <input type="text" placeholder="Search ${labelPlural.toLowerCase()}..." value="${state.search}" oninput="state.search=this.value;render()" class="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" />
+            </div>
+            <button onclick="openModal('party-${type}')" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 flex-shrink-0">${icons.plus} Add ${label}</button>
+          </div>
+          ${filtered.length === 0 ? `
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
+              <div class="text-5xl mb-4">${type === 'supplier' ? '🏭' : '👥'}</div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No ${labelPlural.toLowerCase()} found</h3>
+            </div>` : `
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              ${filtered.map(p => `
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow group">
+                  <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold bg-${colorClass}-100 dark:bg-${colorClass}-900/40 text-${colorClass}-700 dark:text-${colorClass}-400">${p.name.charAt(0).toUpperCase()}</div>
+                      <div><h4 class="font-semibold text-gray-900 dark:text-white">${p.name}</h4>${p.gst ? `<p class="text-xs text-gray-500 dark:text-gray-400">GST: ${p.gst}</p>` : ''}</div>
+                    </div>
+                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onclick="editParty(${p.id})" class="p-1.5 text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.edit}</button>
+                      <button onclick="deleteParty(${p.id})" class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800">${icons.trash}</button>
+                    </div>
+                  </div>
+                  <div class="space-y-1.5 text-sm">
+                    ${p.phone ? `<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400">${icons.phone} ${p.phone}</div>` : ''}
+                    ${p.email ? `<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400">${icons.email}<span class="truncate">${p.email}</span></div>` : ''}
+                    ${p.address ? `<div class="flex items-start gap-2 text-gray-600 dark:text-gray-400">${icons.location}<span class="line-clamp-2">${p.address}</span></div>` : ''}
+                  </div>
+                </div>`).join('')}
+            </div>`}
+        </div>
+      `;
+    }
+
+    function renderModal() {
+      if (!state.modal) return '';
+
+      let title = '', content = '';
+
+      if (state.modal === 'product') {
+        const categories = DB.get('categories');
+        const p = state.editing || { name: '', sku: '', categoryId: '', unit: 'pcs', minStockLevel: 0, purchasePrice: 0, sellingPrice: 0, description: '' };
+        title = state.editing ? 'Edit Product' : 'Add New Product';
+        content = `
+          <form id="modalForm" onsubmit="saveProduct(event)" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name *</label><input type="text" name="name" value="${p.name}" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SKU *</label><input type="text" name="sku" value="${p.sku}" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit</label><select name="unit" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white">${['pcs', 'kg', 'g', 'L', 'ml', 'm', 'box', 'pack', 'dozen'].map(u => `<option value="${u}" ${p.unit === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label><select name="categoryId" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white"><option value="">No Category</option>${categories.map(c => `<option value="${c.id}" ${p.categoryId == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Stock Level</label><input type="number" step="0.01" name="minStockLevel" value="${p.minStockLevel}" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price (₹)</label><input type="number" step="0.01" name="purchasePrice" value="${p.purchasePrice}" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selling Price (₹)</label><input type="number" step="0.01" name="sellingPrice" value="${p.sellingPrice}" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">Cancel</button>
+              <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium">${state.editing ? 'Save Changes' : 'Create Product'}</button>
+            </div>
+          </form>`;
+      } else if (state.modal === 'category') {
+        const c = state.editing || { name: '', description: '' };
+        title = state.editing ? 'Edit Category' : 'Add New Category';
+        content = `
+          <form id="modalForm" onsubmit="saveCategory(event)" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category Name *</label><input type="text" name="name" value="${c.name}" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label><textarea name="description" rows="3" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white resize-none">${c.description || ''}</textarea></div>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">Cancel</button>
+              <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium">${state.editing ? 'Save Changes' : 'Create Category'}</button>
+            </div>
+          </form>`;
+      } else if (state.modal.startsWith('party-')) {
+        const type = state.modal.replace('party-', '');
+        const label = type === 'supplier' ? 'Supplier' : 'Customer';
+        const p = state.editing || { name: '', phone: '', email: '', address: '', gst: '' };
+        title = state.editing ? `Edit ${label}` : `Add New ${label}`;
+        content = `
+          <form id="modalForm" onsubmit="saveParty(event, '${type}')" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${label} Name *</label><input type="text" name="name" value="${p.name}" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            <div class="grid grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label><input type="text" name="phone" value="${p.phone || ''}" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label><input type="email" name="email" value="${p.email || ''}" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            </div>
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">GST Number</label><input type="text" name="gst" value="${p.gst || ''}" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label><textarea name="address" rows="2" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white resize-none">${p.address || ''}</textarea></div>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">Cancel</button>
+              <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium">${state.editing ? 'Save Changes' : `Add ${label}`}</button>
+            </div>
+          </form>`;
+      } else if (state.modal.startsWith('transaction-')) {
+        const type = state.modal.replace('transaction-', '');
+        const partyType = type === 'received' ? 'supplier' : 'customer';
+        const partyLabel = type === 'received' ? 'Supplier' : 'Customer';
+        const colorClass = type === 'received' ? 'green' : 'orange';
+        const products = DB.get('products');
+        const parties = DB.get('parties').filter(p => p.type === partyType);
+        const today = new Date().toISOString().split('T')[0];
+        title = type === 'received' ? 'Record Purchase (Stock In)' : 'Record Sale (Stock Out)';
+        content = `
+          <form id="modalForm" onsubmit="saveTransaction(event, '${type}')" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product *</label><select name="productId" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white"><option value="">Select Product</option>${products.map(p => `<option value="${p.id}">${p.name} (${p.sku})</option>`).join('')}</select></div>
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${partyLabel}</label><select name="partyId" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white"><option value="">Select ${partyLabel}</option>${parties.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+            <div class="grid grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity *</label><input type="number" step="0.01" name="quantity" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price per Unit (₹) *</label><input type="number" step="0.01" name="pricePerUnit" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date *</label><input type="date" name="date" value="${today}" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+              <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invoice #</label><input type="text" name="invoiceNumber" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white" /></div>
+            </div>
+            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label><textarea name="notes" rows="2" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-gray-900 dark:text-white resize-none"></textarea></div>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">Cancel</button>
+              <button type="submit" class="px-5 py-2 bg-${colorClass}-600 hover:bg-${colorClass}-700 text-white rounded-lg text-sm font-medium">${type === 'received' ? 'Record Purchase' : 'Record Sale'}</button>
+            </div>
+          </form>`;
+      }
+
+      return `
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onclick="if(event.target===this)closeModal()">
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${title}</h3>
+              <button onclick="closeModal()" class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded">${icons.close}</button>
+            </div>
+            <div class="p-6">${content}</div>
+          </div>
+        </div>`;
+    }
+
+    function render() {
+      const app = $('app');
+      if (!state.user) {
+        app.innerHTML = renderLogin();
+        $('loginForm')?.addEventListener('submit', login);
+      } else {
+        let pageContent = '';
+        switch (state.page) {
+          case 'dashboard': pageContent = renderDashboard(); break;
+          case 'products': pageContent = renderProducts(); break;
+          case 'categories': pageContent = renderCategories(); break;
+          case 'stock-in': pageContent = renderTransactions('received'); break;
+          case 'stock-out': pageContent = renderTransactions('issued'); break;
+          case 'suppliers': pageContent = renderParties('supplier'); break;
+          case 'customers': pageContent = renderParties('customer'); break;
+        }
+
+        app.innerHTML = `
+          <div class="min-h-screen flex bg-gray-50 dark:bg-gray-950">
+            ${state.sidebarOpen ? '<div class="fixed inset-0 bg-black/50 z-40 lg:hidden" onclick="toggleSidebar()"></div>' : ''}
+            ${renderSidebar()}
+            <main class="flex-1 min-w-0">
+              ${renderTopBar()}
+              <div class="p-4 lg:p-8">${pageContent}</div>
+            </main>
+          </div>
+          ${renderModal()}
+        `;
+      }
+    }
+
+    // ============== ACTIONS ==============
+    function login(e) {
+      e.preventDefault();
+      const email = $('loginEmail').value;
+      const password = $('loginPassword').value;
+      const users = DB.get('users');
+      const user = users.find(u => u.email === email && u.password === password);
+      if (user) {
+        state.user = user;
+        localStorage.setItem('sf_currentUser', JSON.stringify(user));
+        render();
+      } else {
+        const err = $('loginError');
+        err.textContent = 'Invalid email or password';
+        err.classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      state.user = null;
+      localStorage.removeItem('sf_currentUser');
+      render();
+    }
+
+    function navigate(page) {
+      state.page = page;
+      state.search = '';
+      state.catFilter = '';
+      state.sidebarOpen = false;
+      render();
+    }
+
+    function toggleSidebar() {
+      state.sidebarOpen = !state.sidebarOpen;
+      render();
+    }
+
+    function toggleTheme() {
+      state.dark = !state.dark;
+      applyTheme();
+      render();
+    }
+
+    function openModal(type) { state.modal = type; state.editing = null; render(); }
+    function closeModal() { state.modal = null; state.editing = null; render(); }
+
+    function editProduct(id) { state.editing = DB.get('products').find(p => p.id === id); state.modal = 'product'; render(); }
+    function editCategory(id) { state.editing = DB.get('categories').find(c => c.id === id); state.modal = 'category'; render(); }
+    function editParty(id) { const p = DB.get('parties').find(x => x.id === id); state.editing = p; state.modal = `party-${p.type}`; render(); }
+
+    function saveProduct(e) {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const products = DB.get('products');
+      const data = {
+        name: form.get('name'), sku: form.get('sku'), unit: form.get('unit'),
+        categoryId: form.get('categoryId') ? parseInt(form.get('categoryId')) : null,
+        minStockLevel: parseFloat(form.get('minStockLevel')) || 0,
+        purchasePrice: parseFloat(form.get('purchasePrice')) || 0,
+        sellingPrice: parseFloat(form.get('sellingPrice')) || 0
+      };
+      if (state.editing) {
+        const idx = products.findIndex(p => p.id === state.editing.id);
+        products[idx] = { ...products[idx], ...data };
+      } else {
+        products.push({ id: DB.getNextId('product'), ...data, currentStock: 0 });
+      }
+      DB.set('products', products);
+      closeModal();
+    }
+
+    function deleteProduct(id) {
+      if (!confirm('Delete this product?')) return;
+      DB.set('products', DB.get('products').filter(p => p.id !== id));
+      render();
+    }
+
+    function saveCategory(e) {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const categories = DB.get('categories');
+      const data = { name: form.get('name'), description: form.get('description') };
+      if (state.editing) {
+        const idx = categories.findIndex(c => c.id === state.editing.id);
+        categories[idx] = { ...categories[idx], ...data };
+      } else {
+        categories.push({ id: DB.getNextId('category'), ...data });
+      }
+      DB.set('categories', categories);
+      closeModal();
+    }
+
+    function deleteCategory(id) {
+      if (!confirm('Delete this category?')) return;
+      DB.set('categories', DB.get('categories').filter(c => c.id !== id));
+      render();
+    }
+
+    function saveParty(e, type) {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const parties = DB.get('parties');
+      const data = { name: form.get('name'), phone: form.get('phone'), email: form.get('email'), address: form.get('address'), gst: form.get('gst'), type };
+      if (state.editing) {
+        const idx = parties.findIndex(p => p.id === state.editing.id);
+        parties[idx] = { ...parties[idx], ...data };
+      } else {
+        parties.push({ id: DB.getNextId('party'), ...data });
+      }
+      DB.set('parties', parties);
+      closeModal();
+    }
+
+    function deleteParty(id) {
+      if (!confirm('Delete this party?')) return;
+      DB.set('parties', DB.get('parties').filter(p => p.id !== id));
+      render();
+    }
+
+    function saveTransaction(e, type) {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const transactions = DB.get('transactions');
+      const products = DB.get('products');
+      const qty = parseFloat(form.get('quantity'));
+      const price = parseFloat(form.get('pricePerUnit'));
+      const productId = parseInt(form.get('productId'));
+
+      const txn = {
+        id: DB.getNextId('transaction'), type, productId,
+        partyId: form.get('partyId') ? parseInt(form.get('partyId')) : null,
+        quantity: qty, pricePerUnit: price, totalAmount: qty * price,
+        date: form.get('date'), invoiceNumber: form.get('invoiceNumber'), notes: form.get('notes')
+      };
+      transactions.push(txn);
+      DB.set('transactions', transactions);
+
+      // Update stock
+      const prodIdx = products.findIndex(p => p.id === productId);
+      if (prodIdx !== -1) {
+        if (type === 'received') {
+          products[prodIdx].currentStock += qty;
+          products[prodIdx].purchasePrice = price;
+        } else {
+          products[prodIdx].currentStock -= qty;
+          products[prodIdx].sellingPrice = price;
+        }
+        DB.set('products', products);
+      }
+      closeModal();
+    }
+
+    function deleteTransaction(id) {
+      if (!confirm('Delete this transaction? Stock levels will be adjusted.')) return;
+      const transactions = DB.get('transactions');
+      const products = DB.get('products');
+      const txn = transactions.find(t => t.id === id);
+      if (txn) {
+        const prodIdx = products.findIndex(p => p.id === txn.productId);
+        if (prodIdx !== -1) {
+          if (txn.type === 'received') products[prodIdx].currentStock -= txn.quantity;
+          else products[prodIdx].currentStock += txn.quantity;
+          DB.set('products', products);
+        }
+      }
+      DB.set('transactions', transactions.filter(t => t.id !== id));
+      render();
+    }
+
+    // ============== INIT ==============
+    function init() {
+      DB.init();
+      const savedUser = localStorage.getItem('sf_currentUser');
+      if (savedUser) state.user = JSON.parse(savedUser);
+      applyTheme();
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
